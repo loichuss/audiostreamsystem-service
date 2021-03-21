@@ -9,6 +9,7 @@
   "author": "huss",
   "license": "ISC",
   "dependencies": {
+    "axios": "^0.21.1",
     "child_process": "^1.0.2",
     "commander": "^7.1.0",
     "dotenv": "^8.2.0",

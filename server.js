@@ -4,6 +4,7 @@
 require('dotenv').config();
 const _ = require('lodash');
 const http = require('http');
+const axios = require('axios');
 const mysql = require('mysql');
 const cli = require('commander');
 const express = require('express');
@@ -39,8 +40,21 @@ function get_http_player_process() {
   return player;
 }
 
-// const player = get_http_player_process();
+const player = get_http_player_process();
 
+
+//------------------------------------------------------------------------------ Db
+function db_query(req, func) {
+  const ctx = mysql.createConnection({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: 'test'
+  });
+  ctx.connect();
+  ctx.query(req, func);
+  ctx.end();
+}
 
 //------------------------------------------------------------------------------ Mini App V1
 const v1 = express.Router();
@@ -54,52 +68,119 @@ v1.use(function(req, res, next) {
 
 v1.get('/items', (req, res, next) => {
   // const { file } = req.body;
-  
-  const ctx = mysql.createConnection({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: 'test'
-  });
-  ctx.connect();
- 
-  ctx.query('SELECT id, type, name, path FROM items', (error, results, fields) => {
-    if (error) throw error;
 
-    res.status(200).send(results);
-    next();
-  });
- 
-  ctx.end();
+  db_query(
+    'SELECT id, type, name, path FROM items',
+    (error, results, fields) => {
+      if (error) throw error;
+      res.status(200).send(results);
+      next();
+    }
+  );
 });
 
 v1.get('/items/:key', (req, res, next) => {
-  const ctx = mysql.createConnection({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: 'test'
-  });
-  ctx.connect();
- 
-  ctx.query(`SELECT id, type, name, path FROM items WHERE id=${req.params.key} LIMIT 1`, (error, results, fields) => {
-    if (error) throw error;
-
-    res.status(200).send(_.head(results) || {});
-    next();
-  });
- 
-  ctx.end();
+  db_query(
+    `SELECT id, type, name, path FROM items WHERE id=${req.params.key} LIMIT 1`,
+    (error, results, fields) => {
+      if (error) throw error;
+      res.status(200).send(results);
+      next();
+    }
+  );
 });
 
+v1.post('/items', (req, res, next) => {
+  const { name, path, type } = req.body;
 
-// v1.post('/stop', (req, res, next) => {
-//   // const { file } = req.body;
+  if (_.isNil(name) || _.isNil(path) || _.isNil(type)) {
+    res.status(400);
+    next();
+  } else {
+    db_query(
+      `INSERT INTO test.items (id, type, name, path) VALUES (NULL, '${type}', '${name}', '${path}')`,
+      (error, results, fields) => {
+        if (error) throw error;
 
-//   player.stdin.write('stop\n');
-//   res.status(200).send({ done: 'ok' });
-//   next();
-// });
+        db_query(
+          `SELECT id, type, name, path FROM items WHERE id=${results.insertId} LIMIT 1`,
+          (err, result, f) => {
+            if (err) throw error;
+            res.status(200).send(_.head(result) || {});
+            next();
+          }
+        );
+      }
+    );
+  }
+});
+
+function build_player_http_url() {
+  const url = new URL(`http://${process.env.VLC_HOST}:${process.env.VLC_PORT}/`);
+  url.searchParams.append('command', 'in_play');
+  url.searchParams.append('input', 'https://n04a-eu.rcs.revma.com/ypqt40u0x1zuv');
+  
+  return url.href;
+}
+
+v1.patch('/items/:key', (req, res, next) => {
+  const { name, path, type, play } = req.body;
+
+  if (play === true) {
+    db_query(
+      `SELECT id, type, name, path FROM items WHERE id=${req.params.key} LIMIT 1`,
+      (err, result, f) => {
+        if (err) throw error;
+
+        const path = (_.head(result) || {}).path;
+        // axios.get(build_player_http_url(), {
+        //   auth: {
+        //     username: '',
+        //     password: 'F2sR3NEVek57rr'
+        //   }
+        // })
+        //   .then(function (response) {
+        //     // handle success
+        //     console.log(response);
+        //   })
+        //   .catch(function (error) {
+        //     // handle error
+        //     console.log(error);
+        //   })
+        //   .then(function () {
+        //     // always executed
+        //   });
+
+      }
+    );
+    next();
+
+  } else {
+
+    if (_.isNil(name) || _.isNil(path) || _.isNil(type)) {
+      res.status(400);
+      next();
+    } else {
+
+      db_query(
+        `UPDATE test.items SET type='${type}', name='${name}', path='${path}' WHERE id=${req.params.key} LIMIT 1`,
+        (error, results, fields) => {
+          if (error) throw error;
+
+          db_query(
+            `SELECT id, type, name, path FROM items WHERE id=${req.params.key} LIMIT 1`,
+            (err, result, f) => {
+              if (err) throw error;
+              res.status(200).send(_.head(result) || {});
+              next();
+            }
+          );
+        }
+      );
+    }
+  }
+});
+
 
 //------------------------------------------------------------------------------ App
 const app = express();
@@ -126,3 +207,7 @@ http.createServer(app).listen(PORT, () => {
 //   player.stdin.write('stop\n');
 // }, 5000);
 
+// curl -XGET 'http://127.0.0.1:8000/ass-service/v1/items'
+// curl -XPOST 'http://127.0.0.1:8000/ass-service/v1/items' -H "Content-Type: application/json" -d '{"name": "fip", "path": "bla", "type": "stream"}'
+// https://wiki.videolan.org/VLC_HTTP_requests/
+// curl -XPATCH 'http://127.0.0.1:8000/ass-service/v1/items/1' -H "Content-Type: application/json" -d '{"play": true}'
