@@ -136,7 +136,7 @@ v1.patch('/items/:key', (req, res, next) => {
         // axios.get(build_player_http_url(), {
         //   auth: {
         //     username: '',
-        //     password: 'F2sR3NEVek57rr'
+        //     password: process.env.VLC_PASSWORD
         //   }
         // })
         //   .then(function (response) {
