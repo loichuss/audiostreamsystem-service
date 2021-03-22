@@ -8,7 +8,86 @@ const axios = require('axios');
 const mysql = require('mysql');
 const cli = require('commander');
 const express = require('express');
+const parser = require('fast-xml-parser');
 const { spawn } = require('child_process');
+
+
+var he = require('he');
+
+var options = {
+    attributeNamePrefix : "@_",
+    attrNodeName: "attr", //default is 'false'
+    textNodeName : "#text",
+    ignoreAttributes : true,
+    ignoreNameSpace : false,
+    allowBooleanAttributes : false,
+    parseNodeValue : true,
+    parseAttributeValue : false,
+    trimValues: true,
+    cdataTagName: "__cdata", //default is 'false'
+    cdataPositionChar: "\\c",
+    parseTrueNumberOnly: false,
+    arrayMode: false, //"strict"
+    attrValueProcessor: (val, attrName) => he.decode(val, {isAttributeValue: true}),//default is a=>a
+    tagValueProcessor : (val, tagName) => he.decode(val), //default is a=>a
+    stopNodes: ["parse-me-as-string"]
+};
+
+
+var jsonObj =parser.parse(`<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<root>
+<fullscreen>0</fullscreen>
+<audiodelay>0</audiodelay>
+<apiversion>3</apiversion>
+<currentplid>5</currentplid>
+<time>122</time>
+<volume>172</volume>
+<length>0</length>
+<random>false</random>
+<audiofilters>
+  <filter_0></filter_0></audiofilters>
+<rate>1</rate>
+<videoeffects>
+  <hue>0</hue>
+  <saturation>1</saturation>
+  <contrast>1</contrast>
+  <brightness>1</brightness>
+  <gamma>1</gamma></videoeffects>
+<state>playing</state>
+<loop>false</loop>
+<version>2.2.8 Weatherwax</version>
+<position>0</position>
+<repeat>false</repeat>
+<subtitledelay>0</subtitledelay>
+<equalizer></equalizer><information>
+    <category name="meta">
+    <info name='filename'>https://n04a-eu.rcs.revma.com/ypqt40u0x1zuv</info><info name='title'>Radio Nowy Swiat</info><info name='now_playing'>Led Zeppelin - Good Times Bad Times (Live)</info>    </category>
+  <category name='Stream 0'><info name='Bitrate'>128 kb/s</info><info name='Type'>Audio</info><info name='Channels'>Stereo</info><info name='Sample rate'>44100 Hz</info><info name='Codec'>MPEG Audio layer 1/2 (mpga)</info></category>  </information>
+  <stats>
+  <lostabuffers>0</lostabuffers>
+<readpackets>6739</readpackets>
+<lostpictures>0</lostpictures>
+<demuxreadbytes>1966916</demuxreadbytes>
+<demuxbitrate>0.015999654307961</demuxbitrate>
+<playedabuffers>4705</playedabuffers>
+<demuxcorrupted>0</demuxcorrupted>
+<sendbitrate>0</sendbitrate>
+<sentbytes>0</sentbytes>
+<displayedpictures>0</displayedpictures>
+<demuxreadpackets>0</demuxreadpackets>
+<sentpackets>0</sentpackets>
+<inputbitrate>0.016001624986529</inputbitrate>
+<demuxdiscontinuity>0</demuxdiscontinuity>
+<averagedemuxbitrate>0</averagedemuxbitrate>
+<decodedvideo>0</decodedvideo>
+<averageinputbitrate>0</averageinputbitrate>
+<readbytes>1967592</readbytes>
+<decodedaudio>4705</decodedaudio>
+  </stats>
+</root>`, options);
+
+console.log(jsonObj);
+console.log(jsonObj.root.information.category[0].info);
 
 //------------------------------------------------------------------------------ Player
 function get_http_player_process() {
@@ -40,7 +119,24 @@ function get_http_player_process() {
   return player;
 }
 
-const player = get_http_player_process();
+function build_player_base_url() {
+  return new URL(`http://${process.env.VLC_HOST}:${process.env.VLC_PORT}/requests/status.xml`);
+}
+
+function player_action_play(path) {
+  const url = build_player_base_url();
+  url.searchParams.append('command', 'in_play');
+  url.searchParams.append('input', path);
+  
+  return url.href;
+}
+
+function player_action_status() {
+  return build_player_base_url().href;
+}
+
+// create a player process
+// const player = get_http_player_process();
 
 
 //------------------------------------------------------------------------------ Db
@@ -115,45 +211,42 @@ v1.post('/items', (req, res, next) => {
   }
 });
 
-function build_player_http_url() {
-  const url = new URL(`http://${process.env.VLC_HOST}:${process.env.VLC_PORT}/`);
-  url.searchParams.append('command', 'in_play');
-  url.searchParams.append('input', 'https://n04a-eu.rcs.revma.com/ypqt40u0x1zuv');
-  
-  return url.href;
-}
-
 v1.patch('/items/:key', (req, res, next) => {
   const { name, path, type, play } = req.body;
 
   if (play === true) {
+    // the user ask to play a specific item
     db_query(
       `SELECT id, type, name, path FROM items WHERE id=${req.params.key} LIMIT 1`,
       (err, result, f) => {
         if (err) throw error;
 
         const path = (_.head(result) || {}).path;
-        // axios.get(build_player_http_url(), {
-        //   auth: {
-        //     username: '',
-        //     password: process.env.VLC_PASSWORD
-        //   }
-        // })
-        //   .then(function (response) {
-        //     // handle success
-        //     console.log(response);
-        //   })
-        //   .catch(function (error) {
-        //     // handle error
-        //     console.log(error);
-        //   })
-        //   .then(function () {
-        //     // always executed
-        //   });
 
+        if (_.isNil(path)) {
+          res.status(400);
+          next();
+        } else {
+          axios.get(player_action_play(path), {
+            auth: {
+              username: (process.env.VLC_USER || ''),
+              password: process.env.VLC_PASSWORD,
+            }
+          }).then(player_res => {
+            //console.log(res);
+            res.status(200).send(_.head(result) || {});
+            next();
+          }).catch(player_error => {
+            res.status(400);
+            next();
+            // handle error
+            // console.log(error);
+          }).then(() => {
+            // always executed
+          });
+        }
       }
     );
-    next();
 
   } else {
 
