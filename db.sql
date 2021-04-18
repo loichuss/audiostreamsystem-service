@@ -10,6 +10,6 @@ CREATE TABLE `items` (
   PRIMARY KEY (`id`)
 );
 
-INSERT INTO `test`.`items` (`id`, `type`, `name`, `path`, `description`, `country`) VALUES (NULL, 'stream', 'Nowy Świat', 'https://de1.api.radio-browser.info/pls/url/429ed05b-6dae-4027-a9be-7fda436a89fe', 'AAC', 'pl');
-INSERT INTO `test`.`items` (`id`, `type`, `name`, `path`, `description`, `country`) VALUES (NULL, 'stream', 'Nowy Świat', 'https://n04a-eu.rcs.revma.com/ypqt40u0x1zuv', NULL, 'pl');
-INSERT INTO `test`.`items` (`id`, `type`, `name`, `path`, `description`, `country`) VALUES (NULL, 'stream', 'France Info', 'https://de1.api.radio-browser.info/pls/url/aa555e8a-08d9-11e8-ae97-52543be04c81', 'fr');
+INSERT INTO `ass`.`items` (`id`, `type`, `name`, `path`, `description`, `country`) VALUES (NULL, 'stream', 'Nowy Świat', 'https://de1.api.radio-browser.info/pls/url/429ed05b-6dae-4027-a9be-7fda436a89fe', 'AAC', 'pl');
+INSERT INTO `ass`.`items` (`id`, `type`, `name`, `path`, `description`, `country`) VALUES (NULL, 'stream', 'Nowy Świat', 'https://n04a-eu.rcs.revma.com/ypqt40u0x1zuv', NULL, 'pl');
+INSERT INTO `ass`.`items` (`id`, `type`, `name`, `path`, `description`, `country`) VALUES (NULL, 'stream', 'France Info', 'https://de1.api.radio-browser.info/pls/url/aa555e8a-08d9-11e8-ae97-52543be04c81', NULL, 'fr');

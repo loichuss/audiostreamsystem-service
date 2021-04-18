@@ -23,7 +23,7 @@ function start_http_player_process() {
       '--http-password', process.env.VLC_PASSWORD
     ], {
       detached: false,
-      shell: '/bin/csh'
+      shell: '/bin/bash'
     }
   );
   // player.stdin.setEncoding('utf-8');
@@ -151,7 +151,7 @@ function db_query(req, func) {
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
-    database: 'test'
+    database: process.env.DB_DATABASE
   });
   ctx.connect();
   ctx.query(req, func);
@@ -291,7 +291,7 @@ v1.post('/items', (req, res, next) => {
     next();
   } else {
     db_query(
-      `INSERT INTO test.items (id, type, name, path, description, country) VALUES (NULL, '${type}', '${name}', '${path}', '${description}', '${country}')`,
+      `INSERT INTO items (id, type, name, path, description, country) VALUES (NULL, '${type}', '${name}', '${path}', '${description}', '${country}')`,
       (error, results, fields) => {
         if (error) throw error;
 
@@ -350,7 +350,7 @@ v1.patch('/items/:key', (req, res, next) => {
     } else {
 
       db_query(
-        `UPDATE test.items SET type='${type}', name='${name}', path='${path}', description='${description}', country='${country}' WHERE id=${req.params.key} LIMIT 1`,
+        `UPDATE items SET type='${type}', name='${name}', path='${path}', description='${description}', country='${country}' WHERE id=${req.params.key} LIMIT 1`,
         (error, results, fields) => {
           if (error) throw error;
 
